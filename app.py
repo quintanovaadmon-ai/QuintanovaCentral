@@ -47,7 +47,7 @@ def activar_rele_tuya():
             }
         ]
     }
-    respuesta = openapi.post("{API_ENDPOINT}/v1.0/devices/{DEVICE_ID}/commands", comandos)
+    respuesta = openapi.post(f"{API_ENDPOINT}/v1.0/devices/{DEVICE_ID}/commands", comandos)
     return respuesta
 
 @app.route('/activate', methods=['POST'])
