@@ -1,11 +1,24 @@
+import os
+import sqlite3
 from flask import Flask, request, jsonify
 from datetime import datetime
-import sqlite3
 import hashlib
+import logging
+from tuya_connector import TuyaOpenAPI, TUYA_LOGGER
 
 app = Flask(__name__)
-
 DB_PATH = 'tuya_server.db'
+
+# Configuración de Tuya desde variables de entorno
+ACCESS_ID = os.getenv("TUYA_ACCESS_ID", "demo_access_id")
+ACCESS_KEY = os.getenv("TUYA_ACCESS_KEY", "demo_access_key")
+API_ENDPOINT = os.getenv("TUYA_API_ENDPOINT", "https://openapi.tuyaus.com")
+DEVICE_ID = os.getenv("TUYA_DEVICE_ID", "demo_device_id")
+
+# Inicializar conexión con Tuya
+TUYA_LOGGER.setLevel(logging.DEBUG)
+openapi = TuyaOpenAPI(API_ENDPOINT, ACCESS_ID, ACCESS_KEY)
+openapi.connect()
 
 def verify_user(username, password):
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
@@ -25,6 +38,18 @@ def log_activation(username):
     conn.close()
     return timestamp
 
+def activar_rele_tuya():
+    comandos = {
+        "commands": [
+            {
+                "code": "switch_1",
+                "value": True
+            }
+        ]
+    }
+    respuesta = openapi.post(f"/v1.0/iot-03/devices/{DEVICE_ID}/commands", comandos)
+    return respuesta
+
 @app.route('/activate', methods=['POST'])
 def activate():
     data = request.json
@@ -32,12 +57,13 @@ def activate():
     password = data.get('password')
 
     if verify_user(username, password):
-        # Aquí iría la llamada real a la API de Tuya
+        respuesta_tuya = activar_rele_tuya()
         timestamp = log_activation(username)
         return jsonify({
             "status": "success",
             "message": f"Relé activado por {username}",
-            "timestamp": timestamp
+            "timestamp": timestamp,
+            "tuya_response": respuesta_tuya
         })
     else:
         return jsonify({
@@ -56,3 +82,4 @@ def logs():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
