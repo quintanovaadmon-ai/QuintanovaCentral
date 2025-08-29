@@ -1,13 +1,12 @@
+import csv
 import os
-import sqlite3
-from flask import Flask, request, jsonify
-from datetime import datetime
 import hashlib
 import logging
+from datetime import datetime
+from flask import Flask, request, jsonify, render_template_string
 from tuya_connector import TuyaOpenAPI, TUYA_LOGGER
 
 app = Flask(__name__)
-DB_PATH = 'tuya_server.db'
 
 # Configuración de Tuya desde variables de entorno
 ACCESS_ID = os.getenv("TUYA_ACCESS_ID", "ksnyvss88etnjpfr5sd3")
@@ -20,24 +19,31 @@ TUYA_LOGGER.setLevel(logging.DEBUG)
 openapi = TuyaOpenAPI(API_ENDPOINT, ACCESS_ID, ACCESS_KEY)
 openapi.connect()
 
+# Verificar usuario desde users.csv
 def verify_user(username, password):
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, hashed_password))
-    user = c.fetchone()
-    conn.close()
-    return user is not None
+    try:
+        with open("users.csv", newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row['username'] == username and row['password_hash'] == hashed_password:
+                    return True
+    except FileNotFoundError:
+        return False
+    return False
 
+# Registrar activación en logs.csv
 def log_activation(username):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("INSERT INTO logs (username, timestamp) VALUES (?, ?)", (username, timestamp))
-    conn.commit()
-    conn.close()
+    file_exists = os.path.isfile("logs.csv")
+    with open("logs.csv", "a", newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["username", "timestamp"])
+        writer.writerow([username, timestamp])
     return timestamp
 
+# Activar relé Tuya
 def activar_rele_tuya():
     comandos = {
         "commands": [
@@ -50,40 +56,7 @@ def activar_rele_tuya():
     respuesta = openapi.post(f"{API_ENDPOINT}/v1.0/devices/{DEVICE_ID}/commands", comandos)
     return respuesta
 
-@app.route('/activate', methods=['POST'])
-def activate():
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-
-    if verify_user(username, password):
-        respuesta_tuya = activar_rele_tuya()
-        timestamp = log_activation(username)
-        return jsonify({
-            "status": "success",
-            "message": f"Relé activado por {username}",
-            "timestamp": timestamp,
-            "tuya_response": respuesta_tuya
-        })
-    else:
-        return jsonify({
-            "status": "error",
-            "message": "Credenciales inválidas"
-        }), 401
-
-@app.route('/logs', methods=['GET'])
-def logs():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT * FROM logs ORDER BY timestamp DESC")
-    registros = [{"username": row[0], "timestamp": row[1]} for row in c.fetchall()]
-    conn.close()
-    return jsonify(registros)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-from flask import render_template_string
-
+# Ruta principal con formulario HTML
 @app.route('/', methods=['GET'])
 def home():
     html_form = '''
@@ -129,3 +102,41 @@ def home():
     </html>
     '''
     return render_template_string(html_form)
+
+# Ruta para activar el relé
+@app.route('/activate', methods=['POST'])
+def activate():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    if verify_user(username, password):
+        respuesta_tuya = activar_rele_tuya()
+        timestamp = log_activation(username)
+        return jsonify({
+            "status": "success",
+            "message": f"Relé activado por {username}",
+            "timestamp": timestamp,
+            "tuya_response": respuesta_tuya
+        })
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "Credenciales inválidas"
+        }), 401
+
+# Ruta para ver los logs
+@app.route('/logs', methods=['GET'])
+def logs():
+    registros = []
+    try:
+        with open("logs.csv", newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                registros.append({"username": row['username'], "timestamp": row['timestamp']})
+    except FileNotFoundError:
+        pass
+    return jsonify(registros)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
