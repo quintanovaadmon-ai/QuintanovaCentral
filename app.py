@@ -82,4 +82,50 @@ def logs():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+from flask import render_template_string
 
+@app.route('/', methods=['GET'])
+def home():
+    html_form = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Activar Relé</title>
+    </head>
+    <body>
+        <h2>Activar Relé Tuya</h2>
+        <form id="activationForm">
+            <label for="username">Usuario:</label><br>
+            <input type="text" id="username" name="username" required><br><br>
+            <label for="password">Contraseña:</label><br>
+            <input type="password" id="password" name="password" required><br><br>
+            <button type="submit">Activar</button>
+        </form>
+        <p id="response"></p>
+
+        <script>
+        document.getElementById('activationForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            fetch('/activate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('response').innerText = data.message || 'Error';
+            })
+            .catch(error => {
+                document.getElementById('response').innerText = 'Error en la solicitud';
+            });
+        });
+        </script>
+    </body>
+    </html>
+    '''
+    return render_template_string(html_form)
