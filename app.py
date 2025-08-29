@@ -10,10 +10,10 @@ app = Flask(__name__)
 DB_PATH = 'tuya_server.db'
 
 # Configuración de Tuya desde variables de entorno
-ACCESS_ID = os.getenv("TUYA_ACCESS_ID", "demo_access_id")
-ACCESS_KEY = os.getenv("TUYA_ACCESS_KEY", "demo_access_key")
+ACCESS_ID = os.getenv("TUYA_ACCESS_ID", "ksnyvss88etnjpfr5sd3")
+ACCESS_KEY = os.getenv("TUYA_ACCESS_KEY", "2a6375146abf4651bdcc08b5071db467)
 API_ENDPOINT = os.getenv("TUYA_API_ENDPOINT", "https://openapi.tuyaus.com")
-DEVICE_ID = os.getenv("TUYA_DEVICE_ID", "demo_device_id")
+DEVICE_ID = os.getenv("TUYA_DEVICE_ID", "eb1867409b663fd0cdc1ev")
 
 # Inicializar conexión con Tuya
 TUYA_LOGGER.setLevel(logging.DEBUG)
